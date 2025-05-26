@@ -1,0 +1,3 @@
+http:/user:pass@ip:port
+http:/user:pass@ip:port
+If don't have proxy, let this file empty

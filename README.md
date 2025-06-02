@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge&logo=vercel" />
 </p>
 
-**Pharos-Network-BOT** is an advanced automation tool for interacting with the Pharos Testnet and Zenithswap, supporting tasks such as faucet claiming, checkin, USDC/PHRS swaps, sending PHRS to friends, and more.
+**Pharos-Network-BOT** is an advanced automation tool for interacting with the Pharos Testnet and Zenithswap, supporting tasks such as faucet claiming, checkin, USDC/PHRS swaps, sending PHRS to friends, add LP, mint NFT Gotchipus,...
 Features proxy per-account, multicall, anti-block, custom threading, detailed logging, and retry logic.
 
 ---
@@ -18,6 +18,7 @@ Features proxy per-account, multicall, anti-block, custom threading, detailed lo
 * 🔹 Swap tokens (PHRS ↔ USDC) with router multicall
 * 🔹 Send PHRS to friends (auto-verify task)
 * 🔹 Add LP (liquidity) for WPHRS/USDC V3 pool
+* 🔹 Mint NFT Gotchipus
 * 🔹 Combine actions (all-in-one random/sequential)
 * 🔹 Supports HTTPS proxy per wallet
 * 🔹 Multi-threaded (customizable)
@@ -134,6 +135,7 @@ npm start
 | 5      | Send PHRS to random friends (with verify task) |
 | 6      | Add LP (WPHRS/USDC)                            |
 | 7      | Run ALL (4+5+6, random order, with sleep)      |
+| 8      | Mint Gotchipus NFT                             |
 | 0      | Exit                                           |
 
 For each function, follow prompts for amount, repeat, etc.

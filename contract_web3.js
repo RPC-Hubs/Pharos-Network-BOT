@@ -28,6 +28,10 @@ export const POOL_ABI = [
   "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
 ];
 
+export const MINT_ABI = [
+    "function mint(address _asset, address _account, uint256 _amount)"
+];
+
 export const ERC20_ABI = [
   {
     constant: true,

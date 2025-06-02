@@ -46,7 +46,7 @@ process.on('uncaughtException', (err) => {
 import {
     PHAROS_RPC, CHAIN_ID,
     WPHRS_ADDRESS, USDC_ADDRESS, SWAP_ROUTER_ADDRESS,
-    ERC20_ABI, SWAP_ROUTER_ABI, USDC_POOL_ADDRESS, LP_ROUTER_ADDRESS, LP_ROUTER_ABI, POOL_ABI
+    ERC20_ABI, SWAP_ROUTER_ABI, USDC_POOL_ADDRESS, LP_ROUTER_ADDRESS, LP_ROUTER_ABI, POOL_ABI, MINT_ABI
 } from "./contract_web3.js";
 
 const limit = pLimit(THREADS);
@@ -240,43 +240,70 @@ async function faucetPharos(idx, privkey, proxy) {
 }
 
 // Module 2
+const USDC_FAUCET_AMOUNT = ethers.parseUnits("1000", 18);
+
 async function faucetZenithUSDC(idx, address, privkey, proxy) {
-    const client = getAxiosWithProxy(proxy);
     let retry = 0, success = false, prefix = "";
+    const provider = getProviderWithProxy(proxy);
+    const wallet = new ethers.Wallet(privkey, provider);
+
+    const FAUCET_CONTRACT = "0x11de0e754f1df7c7b0d559721b334809a9c0dfb7";
+    const USDC_TOKEN = "0xad902cf99c2de2f1ba5ec4d642fd7e49cae9ee37";
+    const AMOUNT = USDC_FAUCET_AMOUNT;
+
+    const contract = new ethers.Contract(FAUCET_CONTRACT, MINT_ABI, wallet);
+
     while (retry < MAX_RETRIES && !success) {
         prefix = chalk.cyan(`${nowStr()} [${idx}] [${chalk.yellow(shortAddr(address))}]`);
         const ip = await getCurrentIp(proxy);
-        console.log(`${prefix} USDC faucet [Retry ${retry + 1}/${MAX_RETRIES}] Proxy: ${chalk.green(ip)}`);
+        console.log(
+            chalk.blueBright(`${prefix} `) +
+            chalk.magentaBright(`USDC faucet`) +
+            chalk.gray(` [Retry ${retry + 1}/${MAX_RETRIES}] `) +
+            chalk.yellowBright(`Proxy: `) +
+            chalk.green(ip)
+        );
+
         try {
-            const payload = { tokenAddress: ZENITH_TOKEN_ADDRESS, userAddress: address };
-            const { data } = await client.post(ZENITH_FAUCET_URL, payload, {
-                headers: {
-                    "Accept": "*/*",
-                    "Content-Type": "application/json",
-                    "Origin": "https://testnet.zenithswap.xyz",
-                    "Referer": "https://testnet.zenithswap.xyz/",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-                }
-            });
-            const status = data?.status, message = data?.message || "";
-            if (status === 200 && message === "ok") {
-                console.log(`${prefix} ${chalk.green("USDC faucet via Zenithswap successful!")}`);
-                fs.appendFileSync(USDC_SUCCESS_FILE, `${address}:${privkey}\n`);
-                success = true;
-            } else if (message.includes("has already got token today")) {
-                console.log(`${prefix} ${chalk.yellow("USDC faucet already claimed today.")}`);
-                fs.appendFileSync(USDC_SUCCESS_FILE, `${address}:${privkey}\n`);
-                success = true;
-            } else {
-                console.log(`${prefix} ${chalk.red("USDC faucet failed: " + JSON.stringify(data))}`);
-                retry++;
-            }
+            // Send the mint transaction
+            const gasLimit = await contract.mint.estimateGas(USDC_TOKEN, address, AMOUNT)
+                .then(gas => gas + 5000n)
+                .catch(() => 100_000n);
+
+            const tx = await contract.mint(
+                USDC_TOKEN,
+                address,
+                AMOUNT,
+                { gasLimit }
+            );
+            console.log(
+                chalk.blueBright(`${prefix} `) +
+                chalk.cyanBright(`Sending USDC faucet transaction... `) +
+                chalk.gray(`TX: ${tx.hash}`)
+            );
+            await tx.wait();
+            console.log(
+                chalk.blueBright(`${prefix} `) +
+                chalk.greenBright("USDC faucet via Zenithswap successful! ") +
+                chalk.gray(`TX: ${tx.hash}`)
+            );
+            fs.appendFileSync(USDC_SUCCESS_FILE, `${address}:${privkey}\n`);
+            success = true;
         } catch (e) {
-            console.log(`${prefix} ${chalk.red("USDC faucet request error: " + e.message)}`);
+            console.log(
+                chalk.blueBright(`${prefix} `) +
+                chalk.redBright("USDC faucet error: ") +
+                chalk.gray(e.message)
+            );
             retry++;
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
     if (!success) {
+        console.log(
+            chalk.blueBright(`${prefix} `) +
+            chalk.redBright("USDC faucet failed after max retries. Written to failed file.")
+        );
         fs.appendFileSync(USDC_FAILED_FILE, `${address}:${privkey}\n`);
     }
 }
@@ -796,30 +823,77 @@ async function runModule7ForAllAccounts(privs, proxies, repeat, min_amount, max_
     await Promise.all(tasks);
 }
 
+// Module 8: Mint NFT Gotchipus
+async function mintGotchipusNFT(idx, privkey, proxy) {
+    let retry = 0, success = false;
+    const provider = getProviderWithProxy(proxy);
+    const wallet = new ethers.Wallet(privkey, provider);
+    const address = wallet.address;
+    const prefix = chalk.cyan(`${nowStr()} [${idx}] [${chalk.yellow(shortAddr(address))}]`);
+
+    const CONTRACT_ADDRESS = "0x0000000038f050528452d6da1e7aacfa7b3ec0a8";
+    const RAW_DATA = "0x5b70ea9f";
+
+    while (retry < MAX_RETRIES && !success) {
+        const ip = await getCurrentIp(proxy);
+        console.log(`${prefix} Mint Gotchipus NFT [Retry ${retry + 1}/${MAX_RETRIES}] Proxy: ${chalk.green(ip)}`);
+        try {
+            let gasLimit;
+            try {
+                gasLimit = await provider.estimateGas({
+                    to: CONTRACT_ADDRESS,
+                    data: RAW_DATA,
+                    from: address,
+                });
+                gasLimit = gasLimit + 5000n;
+            } catch {
+                gasLimit = 339_000n;
+            }
+
+            const tx = await wallet.sendTransaction({
+                to: CONTRACT_ADDRESS,
+                data: RAW_DATA,
+                gasLimit,
+            });
+
+            console.log(`${prefix} Sending mint transaction... TX: ${chalk.blue(tx.hash)}`);
+            await tx.wait();
+            console.log(`${prefix} ${chalk.green("Mint Gotchipus NFT successful!")} TX: ${chalk.blue(tx.hash)}`);
+        } catch (e) {
+            console.log(`${prefix} ${chalk.red("Mint NFT error: " + e.message)}`);
+            retry++;
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    }
+}
+
 // ========== CLI ==========
 function menu() {
-    console.log(chalk.cyan("\n========= Pharos Network Faucet Menu ========="));
-    console.log(chalk.yellow("1. Faucet Pharos and daily checkin"));
+    console.log(chalk.cyan("\n========= Pharos Network Main Menu ========="));
+    console.log(chalk.yellow("1. Faucet Pharos and daily check-in"));
     console.log(chalk.yellow("2. Faucet USDC (Zenithswap)"));
     console.log(chalk.yellow("3. Faucet both (Pharos then USDC)"));
     console.log(chalk.yellow("4. Swap tokens on Zenithswap (PHRS <-> USDC)"));
     console.log(chalk.yellow("5. Send PHRS to random friends (from walletsToSend.txt)"));
     console.log(chalk.yellow("6. Add Liquidity (WPHRS/USDC V3)"));
-    console.log(chalk.yellow("7. Run All (Swap + Send PHRS + Add LP, random module, sleep between)"));
+    console.log(chalk.yellow("7. Run All (Swap + Send PHRS + Add LP, random module order, sleep between)"));
+    console.log(chalk.yellow("8. Mint NFT Gotchipus"));
     console.log(chalk.yellow("0. Exit"));
     console.log(chalk.yellow("More features update soon..."));
-    console.log(chalk.cyan("=========================================="));
+    console.log(chalk.cyan("=============================================="));
     while (true) {
-        const choice = prompt(chalk.green("Enter your choice (1/2/3/4/5/6/7/0): ")).trim();
-        if (["1", "2", "3", "4", "5", "6", "7", "0"].includes(choice)) return choice;
-        console.log(chalk.red("Invalid choice! Please enter 1, 2, 3, 4, 5, 6, 7 or 0."));
+        const choice = prompt(
+            chalk.green("Enter your choice (1/2/3/4/5/6/7/8/0): ")
+        ).trim();
+        if (["1", "2", "3", "4", "5", "6", "7", "8", "0"].includes(choice)) return choice;
+        console.log(chalk.red("Invalid choice! Please enter 1, 2, 3, 4, 5, 6, 7, 8 or 0."));
     }
 }
 
 // ========== MAIN ==========
 async function main() {
     const privs = loadLines(PRIV_FILE);
-    const proxies = loadLines(PROXIES_FILE, {allowNullIfEmpty: true});
+    const proxies = loadLines(PROXIES_FILE, { allowNullIfEmpty: true });
 
     while (true) {
         displayBanner();
@@ -879,8 +953,13 @@ async function main() {
             const repeat = parseInt(prompt("Enter repeat times: "));
             const walletsToSend = loadWalletsToSend(WALLETS_TO_SEND_FILE);
             await runModule7ForAllAccounts(privs, proxies, repeat, min_amount, max_amount, walletsToSend);
+        } else if (choice === "8") {
+            // Mint NFT Gotchipus
+            const repeat = Math.max(1, parseInt(prompt("Enter repeat times: "))) || 1;
+            await runParallelWithPLimit(mintGotchipusNFT, privs, proxies, repeat);
         }
     }
 }
 
 main();
+

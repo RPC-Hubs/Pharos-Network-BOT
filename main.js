@@ -834,7 +834,7 @@ async function mintGotchipusNFT(idx, privkey, proxy) {
     const CONTRACT_ADDRESS = "0x0000000038f050528452d6da1e7aacfa7b3ec0a8";
     const RAW_DATA = "0x5b70ea9f";
 
-    while (retry < MAX_RETRIES && !success) {
+    while (retry < MAX_RETRIES) {
         const ip = await getCurrentIp(proxy);
         console.log(`${prefix} Mint Gotchipus NFT [Retry ${retry + 1}/${MAX_RETRIES}] Proxy: ${chalk.green(ip)}`);
         try {
